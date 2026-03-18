@@ -1,0 +1,205 @@
+import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+
+function CameraIDScan({ onDone }) {
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const [cameraState, setCameraState] = useState("idle");
+
+  const startCamera = async () => {
+    try {
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        setCameraState("unsupported");
+        return;
+      }
+
+      setCameraState("loading");
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+        },
+        audio: false,
+      });
+
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
+      }
+
+      setCameraState("ready");
+    } catch (err) {
+      console.error("Camera error", err);
+      if (err?.name === "NotAllowedError" || err?.name === "SecurityError") {
+        setCameraState("denied");
+      } else {
+        setCameraState("error");
+      }
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, []);
+
+  return (
+    <div className="text-center flex flex-col items-center px-6">
+      <h1 className="text-4xl font-bold mb-4">Scan Your ID</h1>
+      <p className="text-white/80 mb-8">Align your ID within the frame</p>
+
+      <div className="relative w-[360px] h-[240px] rounded-2xl overflow-hidden border border-white/30 bg-black/10">
+        {cameraState === "ready" ? (
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/10 backdrop-blur-sm">
+            <div className="text-center px-6">
+              <div className="text-lg font-semibold mb-2">
+                {cameraState === "loading" && "Starting Camera..."}
+                {cameraState === "idle" && "Camera Access Needed"}
+                {cameraState === "unsupported" && "Camera Not Supported Here"}
+                {cameraState === "denied" && "Camera Access Denied"}
+                {cameraState === "error" && "Unable To Start Camera"}
+              </div>
+              <p className="text-sm text-white/80">
+                {cameraState === "idle" && "Tap below to allow camera access."}
+                {cameraState === "loading" && "Please approve camera permissions in your browser."}
+                {cameraState === "unsupported" && "Open this in a normal browser tab or deploy it to use the camera."}
+                {cameraState === "denied" && "Enable camera permissions in your browser settings and try again."}
+                {cameraState === "error" && "Try again or open this in a secure browser environment."}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="w-64 h-40 border-2 border-white rounded-lg shadow-[0_0_0_1px_rgba(255,255,255,0.1)]" />
+        </div>
+
+        <motion.div
+          initial={{ y: 0 }}
+          animate={{ y: [0, 200, 0] }}
+          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute left-0 right-0 h-[2px] bg-white/70 pointer-events-none"
+        />
+      </div>
+
+      {cameraState !== "ready" ? (
+        <button
+          onClick={startCamera}
+          className="mt-8 px-6 py-3 rounded-full bg-white text-blue-500 font-bold"
+        >
+          Enable Camera
+        </button>
+      ) : (
+        <button
+          onClick={onDone}
+          className="mt-8 px-6 py-3 rounded-full bg-white text-blue-500 font-bold"
+        >
+          Capture ID
+        </button>
+      )}
+    </div>
+  );
+}
+
+function FacePlaceholder() {
+  return (
+    <div className="text-center px-6">
+      <h1 className="text-4xl font-bold mb-4">Face Scan Next</h1>
+      <p className="text-white/80">This screen will open after the ID capture step.</p>
+    </div>
+  );
+}
+
+export default function VeriLaneKioskPrototype() {
+  const [screen, setScreen] = useState("welcome");
+
+  const screenVariants = {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -20 },
+  };
+
+  return (
+    <div className="min-h-screen bg-blue-400 text-white flex items-center justify-center font-sans">
+      <AnimatePresence mode="wait">
+        {screen === "welcome" && (
+          <motion.div
+            key="welcome"
+            variants={screenVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.4 }}
+            onClick={() => setScreen("id")}
+            className="w-full h-full flex items-center justify-center cursor-pointer"
+          >
+            <div className="text-center">
+              <h1 className="text-6xl font-bold tracking-wide mb-6 flex justify-center">
+                {"Welcome".split("").map((char, index) => (
+                  <motion.span
+                    key={index}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: [0, -3, 0] }}
+                    transition={{
+                      delay: index * 0.1,
+                      duration: 3,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
+                    className="inline-block"
+                  >
+                    {char}
+                  </motion.span>
+                ))}
+              </h1>
+              <div className="mt-2 inline-flex items-center gap-3 rounded-full border border-white/40 bg-white/10 px-6 py-3 text-base font-bold tracking-wide backdrop-blur-sm">
+                <span>Begin Verification</span>
+                <span className="text-xl leading-none">→</span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {screen === "id" && (
+          <motion.div
+            key="id"
+            variants={screenVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.4 }}
+            className="w-full h-full flex items-center justify-center"
+          >
+            <CameraIDScan onDone={() => setScreen("face")} />
+          </motion.div>
+        )}
+
+        {screen === "face" && (
+          <motion.div
+            key="face"
+            variants={screenVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.4 }}
+            className="w-full h-full flex items-center justify-center"
+          >
+            <FacePlaceholder />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
